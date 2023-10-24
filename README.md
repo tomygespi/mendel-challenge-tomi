@@ -19,7 +19,7 @@ After it has finished, execute the following command to check if the docker imag
 
 Example output:
 
-![img.png](img.png)
+![img.png](documentation/images/img.png)
 
 Start your application by running:
 
@@ -27,4 +27,4 @@ Start your application by running:
 
 Now you can send requests with Postman to your containerized application:
 
-![img_1.png](img_1.png)
+![img_1.png](documentation/images/img_1.png)
