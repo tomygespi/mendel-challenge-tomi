@@ -1,7 +1,6 @@
 package com.challenge.java.tomi.integration;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -241,7 +240,7 @@ public class TransactionControllerIntegrationTest {
 
         @Test
         @SneakyThrows
-        public void givenTransactionOtherTypeThanParent_whenCreate_thenReturnBadRequestWithIllegalArgumentException() {
+        public void givenTransactionOtherTypeThanParent_whenCreate_thenReturnTransaction() {
             //given
             Transaction parentTransaction = transactionRepository.save(newParentTransaction());
             TransactionDTO transactionDTO = newTransactionDTO();
@@ -249,20 +248,26 @@ public class TransactionControllerIntegrationTest {
             transactionDTO.setType(OTHER_TRANSACTION_TYPE.name());
 
             //when
-            MvcResult response =
-                    mockMvc
-                            .perform(put(String.format(CREATE_TRANSACTION_ENDPOINT, TRANSACTION_ID))
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsBytes(transactionDTO)))
-                            //then
-                            .andDo(print())
-                            .andExpect(status().isBadRequest())
-                            .andReturn();
+            mockMvc
+                    .perform(put(String.format(CREATE_TRANSACTION_ENDPOINT, TRANSACTION_ID))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(transactionDTO)))
+                    //then
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(TRANSACTION_ID))
+                    .andExpect(jsonPath("$.type").value(OTHER_TRANSACTION_TYPE.name()))
+                    .andExpect(jsonPath("$.amount").value(TRANSACTION_AMOUNT))
+                    .andExpect(jsonPath("$.parentId").value(TRANSACTION_PARENT_ID));
 
-            assertEquals(IllegalArgumentException.class, response.getResolvedException().getClass());
-            assertEquals(
-                    String.format(DIFFERENT_TRANSACTION_TYPES_ERROR_MESSAGE, parentTransaction.getType().toString()),
-                    response.getResolvedException().getMessage());
+            Transaction savedTransaction = transactionRepository.findTransactionById(TRANSACTION_ID);
+            Transaction savedParentTransaction = transactionRepository.findTransactionById(TRANSACTION_PARENT_ID);
+
+            assertNotNull(savedTransaction);
+            assertNotNull(parentTransaction);
+            assertEquals(TRANSACTION_ID, savedTransaction.getId());
+            assertEquals(TRANSACTION_PARENT_ID, savedParentTransaction.getId());
+            assertNotEquals(savedParentTransaction.getId(), savedTransaction.getId());
         }
     }
 

@@ -84,11 +84,6 @@ public class TransactionService implements ITransactionService {
             throw new NotFoundException(
                     String.format("Parent transaction with ID %s doesn't exist.", transaction.getParentId()));
         }
-        if (transaction.getType() != parentTransaction.getType()) {
-            throw new IllegalArgumentException(
-                    String.format("Given transaction can't have a different type than it's parent, which is: %s",
-                            parentTransaction.getType()));
-        }
     }
 
     private void validateType(String type) {
