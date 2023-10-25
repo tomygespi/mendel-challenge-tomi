@@ -45,11 +45,11 @@ public class TransactionControllerIntegrationTest {
 
     private static final Double TRANSACTION_AMOUNT = 123.0;
 
-    private static final TypeEnum TRANSACTION_TYPE = TypeEnum.ARS;
+    private static final TypeEnum TRANSACTION_TYPE = TypeEnum.CARS;
 
     private static final Long OTHER_TRANSACTION_ID = 3L;
 
-    private static final TypeEnum OTHER_TRANSACTION_TYPE = TypeEnum.MXN;
+    private static final TypeEnum OTHER_TRANSACTION_TYPE = TypeEnum.SHOPPING;
 
     private static final Double OTHER_TRANSACTION_AMOUNT = 100.0;
 
@@ -57,9 +57,9 @@ public class TransactionControllerIntegrationTest {
 
     private static final Double TRANSACTION_PARENT_AMOUNT = 456.7;
 
-    private static final TypeEnum TRANSACTION_PARENT_TYPE = TypeEnum.ARS;
+    private static final TypeEnum TRANSACTION_PARENT_TYPE = TypeEnum.CARS;
 
-    private static final String UNHANDLED_TRANSACTION_TYPE = "USD";
+    private static final String UNHANDLED_TRANSACTION_TYPE = "HOTEL";
 
     private static final String AMOUNT_ERROR_MESSAGE = "Amount should be a non empty number.";
 

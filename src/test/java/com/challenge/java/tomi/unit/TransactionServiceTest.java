@@ -36,7 +36,7 @@ public class TransactionServiceTest {
 
     private static final Double TRANSACTION_AMOUNT = 123.0;
 
-    private static final TypeEnum TRANSACTION_TYPE = TypeEnum.ARS;
+    private static final TypeEnum TRANSACTION_TYPE = TypeEnum.CARS;
 
     private static final Long TRANSACTION_PARENT_ID = 1L;
 

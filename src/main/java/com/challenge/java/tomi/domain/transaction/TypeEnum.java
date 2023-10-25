@@ -4,8 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum TypeEnum {
-    ARS("ARS"),
-    MXN("MXN");
+    CARS("CARS"),
+    SHOPPING("SHOPPING"),
+    FOOD("FOOD");
 
     private static class Holder {
         static Map<String, TypeEnum> TYPE_MAP = new HashMap<>();

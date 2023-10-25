@@ -28,13 +28,13 @@ public class AmountServiceTest {
 
     private static final Double PARENT_TRANSACTION_AMOUNT = 123.0;
 
-    private static final TypeEnum PARENT_TRANSACTION_TYPE = TypeEnum.ARS;
+    private static final TypeEnum PARENT_TRANSACTION_TYPE = TypeEnum.CARS;
 
     private static final Long CHILD_TRANSACTION_ID = 2L;
 
     private static final Double CHILD_TRANSACTION_AMOUNT = 345.6;
 
-    private static final TypeEnum CHILD_TRANSACTION_TYPE = TypeEnum.ARS;
+    private static final TypeEnum CHILD_TRANSACTION_TYPE = TypeEnum.CARS;
 
     @Mock
     private TransactionRepository transactionRepository;
