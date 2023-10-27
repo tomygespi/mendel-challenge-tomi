@@ -1,4 +1,4 @@
-package com.challenge.java.tomi.unit;
+package com.challenge.java.tomi.unit.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.challenge.java.tomi.domain.Transaction;
 import com.challenge.java.tomi.domain.transaction.TypeEnum;
@@ -16,12 +18,13 @@ import com.challenge.java.tomi.exception.AlreadyExistsException;
 import com.challenge.java.tomi.exception.NotFoundException;
 import com.challenge.java.tomi.mapper.TransactionMapper;
 import com.challenge.java.tomi.mapper.TransactionMapperImpl;
-import com.challenge.java.tomi.repository.TransactionRepository;
 import com.challenge.java.tomi.service.ITransactionService;
 import com.challenge.java.tomi.service.TransactionService;
+import com.challenge.java.tomi.storage.TransactionStorage;
+import jakarta.persistence.EntityExistsException;
+import jakarta.persistence.EntityNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,9 +46,8 @@ public class TransactionServiceTest {
     private static final String UNHANDLED_TRANSACTION_TYPE = "USD";
 
     private final TransactionMapper transactionMapper = new TransactionMapperImpl();
-
     @Mock
-    private TransactionRepository transactionRepository;
+    private TransactionStorage transactionStorage;
 
     private AutoCloseable closeable;
 
@@ -55,7 +57,7 @@ public class TransactionServiceTest {
     public void initService() {
         closeable = MockitoAnnotations.openMocks(this);
         transactionService =
-                new TransactionService(this.transactionMapper, this.transactionRepository);
+                new TransactionService(this.transactionMapper, this.transactionStorage);
     }
 
     @AfterEach
@@ -70,19 +72,16 @@ public class TransactionServiceTest {
         public void givenTransactionDto_whenCreateTransaction_thenSave() {
             //given
             TransactionDTO transactionDTO = newTransactionDTO();
-            Transaction mappedTransaction = newMappedTransactionFromTransactionDTO(transactionDTO);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.save(any(Transaction.class))).thenReturn(mappedTransaction);
+            doNothing().when(transactionStorage).save(any(Transaction.class));
 
-            Transaction savedTransaction = transactionService.create(TRANSACTION_ID, transactionDTO);
+            TransactionDTO savedTransaction = transactionService.create(TRANSACTION_ID, transactionDTO);
 
             //then
-            verify(transactionRepository, atLeastOnce()).save(any(Transaction.class));
-            assertEquals(TRANSACTION_ID, savedTransaction.getId());
+            verify(transactionStorage, atLeastOnce()).save(any(Transaction.class));
             assertEquals(TRANSACTION_AMOUNT, savedTransaction.getAmount());
-            assertEquals(TRANSACTION_TYPE, savedTransaction.getType());
+            assertEquals(TRANSACTION_TYPE.name(), savedTransaction.getType());
         }
 
         @Test
@@ -90,7 +89,6 @@ public class TransactionServiceTest {
         public void givenTransactionDTOWithSavedParent_whenCreateTransaction_thenSave() {
             //given
             TransactionDTO transactionDTO = newTransactionDTOWithParentId();
-            Transaction mappedTransaction = newMappedTransactionFromTransactionDTO(transactionDTO);
 
             Transaction parentTransaction = new Transaction();
             parentTransaction.setId(TRANSACTION_PARENT_ID);
@@ -98,50 +96,15 @@ public class TransactionServiceTest {
             parentTransaction.setAmount(TRANSACTION_AMOUNT);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.findTransactionById(TRANSACTION_PARENT_ID)).thenReturn(parentTransaction);
-            when(transactionRepository.save(any(Transaction.class))).thenReturn(mappedTransaction);
+            doNothing().when(transactionStorage).save(any(Transaction.class));
 
-            Transaction savedTransaction = transactionService.create(TRANSACTION_ID, transactionDTO);
+            TransactionDTO savedTransaction = transactionService.create(TRANSACTION_ID, transactionDTO);
 
             //then
-            verify(transactionRepository, atLeastOnce()).save(any(Transaction.class));
-            assertEquals(TRANSACTION_ID, savedTransaction.getId());
+            verify(transactionStorage, atLeastOnce()).save(any(Transaction.class));
             assertEquals(TRANSACTION_AMOUNT, savedTransaction.getAmount());
-            assertEquals(TRANSACTION_TYPE, savedTransaction.getType());
+            assertEquals(TRANSACTION_TYPE.name(), savedTransaction.getType());
             assertEquals(TRANSACTION_PARENT_ID, savedTransaction.getParentId());
-        }
-
-        @Test
-        @SneakyThrows
-        public void givenTransactionDTOWithoutAmount_whenCreateTransaction_thenThrowIllegalArgumentException() {
-            //given
-            TransactionDTO transactionDTO = newTransactionDTO();
-            transactionDTO.setAmount(null);
-
-            //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-
-            //then
-            assertThrows(IllegalArgumentException.class, () -> {
-                transactionService.create(TRANSACTION_ID, transactionDTO);
-            });
-        }
-
-        @Test
-        @SneakyThrows
-        public void givenTransactionDTOWithUnhandledType_whenCreateTransaction_thenThrowIllegalArgumentException() {
-            //given
-            TransactionDTO transactionDTO = newTransactionDTO();
-            transactionDTO.setType(UNHANDLED_TRANSACTION_TYPE);
-
-            //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-
-            //then
-            assertThrows(IllegalArgumentException.class, () -> {
-                transactionService.create(TRANSACTION_ID, transactionDTO);
-            });
         }
 
         @Test
@@ -152,7 +115,7 @@ public class TransactionServiceTest {
             Transaction mappedTransaction = newMappedTransactionFromTransactionDTO(transactionDTO);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.of(mappedTransaction));
+            doThrow(EntityExistsException.class).when(transactionStorage).save(any(Transaction.class));
 
             //then
             assertThrows(AlreadyExistsException.class, () -> {
@@ -162,37 +125,15 @@ public class TransactionServiceTest {
 
         @Test
         @SneakyThrows
-        public void givenTransactionDTOWithNonExistingParent_whenCreateTransaction_thenThrowIllegalArgumentException() {
+        public void givenTransactionDTOWithNonExistingParent_whenCreateTransaction_thenThrowNotFoundException() {
             //given
             TransactionDTO transactionDTO = newTransactionDTOWithParentId();
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.findTransactionById(TRANSACTION_PARENT_ID)).thenReturn(null);
+            doThrow(EntityNotFoundException.class).when(transactionStorage).save(any(Transaction.class));
+
             //then
             assertThrows(NotFoundException.class, () -> {
-                transactionService.create(TRANSACTION_ID, transactionDTO);
-            });
-        }
-
-        @Test
-        @SneakyThrows
-        public void givenTransactionWithTypeDifferentThanParent_whenCreateTransaction_thenThrowIllegalArgumentException() {
-            //given
-            TransactionDTO transactionDTO = newTransactionDTOWithParentId();
-            transactionDTO.setType("MXN");
-
-            Transaction parentTransaction = new Transaction();
-            parentTransaction.setId(TRANSACTION_PARENT_ID);
-            parentTransaction.setType(TRANSACTION_TYPE);
-            parentTransaction.setAmount(TRANSACTION_AMOUNT);
-
-            //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.findTransactionById(TRANSACTION_PARENT_ID)).thenReturn(parentTransaction);
-
-            //then
-            assertThrows(IllegalArgumentException.class, () -> {
                 transactionService.create(TRANSACTION_ID, transactionDTO);
             });
         }
@@ -209,8 +150,7 @@ public class TransactionServiceTest {
                     new ArrayList<>(List.of(newMappedTransactionFromTransactionDTO(newTransactionDTO())));
 
             //when
-            when(transactionRepository.findTransactionsByType(TRANSACTION_TYPE)).thenReturn(savedTransactions);
-
+            when(transactionStorage.findAllByType(TRANSACTION_TYPE)).thenReturn(savedTransactions);
             List<Long> foundTransactionIds = transactionService.findTransactionIdsByType(transactionType);
 
             //then
@@ -225,7 +165,6 @@ public class TransactionServiceTest {
             //given
             String transactionType = TRANSACTION_TYPE.name();
             //when
-            when(transactionRepository.findTransactionsByType(TRANSACTION_TYPE)).thenReturn(new ArrayList<>());
 
             List<Long> foundTransactionIds = transactionService.findTransactionIdsByType(transactionType);
 

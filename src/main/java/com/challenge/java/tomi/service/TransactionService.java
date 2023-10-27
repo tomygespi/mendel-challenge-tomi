@@ -6,84 +6,53 @@ import com.challenge.java.tomi.dto.TransactionDTO;
 import com.challenge.java.tomi.exception.AlreadyExistsException;
 import com.challenge.java.tomi.exception.NotFoundException;
 import com.challenge.java.tomi.mapper.TransactionMapper;
-import com.challenge.java.tomi.repository.TransactionRepository;
+import com.challenge.java.tomi.storage.TransactionStorage;
+import jakarta.persistence.EntityExistsException;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.validation.ValidationException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TransactionService implements ITransactionService {
 
     private final TransactionMapper transactionMapper;
-    private final TransactionRepository transactionRepository;
+    private final TransactionStorage transactionStorage;
 
-    public TransactionService(TransactionMapper transactionMapper, TransactionRepository transactionRepository) {
+    public TransactionService(TransactionMapper transactionMapper, TransactionStorage transactionStorage) {
         this.transactionMapper = transactionMapper;
-        this.transactionRepository = transactionRepository;
+        this.transactionStorage = transactionStorage;
     }
 
     @Transactional
     @Override
-    public Transaction create(Long id, TransactionDTO transactionDTO) {
-        Transaction transaction = this.transactionMapper.toTransaction(transactionDTO);
-        transaction.setId(id);
-        this.validateBeforeCreate(transaction);
-        return this.transactionRepository.save(transaction);
+    public TransactionDTO create(Long id, TransactionDTO transactionDTO) {
+        try {
+            Transaction transaction = this.transactionMapper.toTransaction(transactionDTO);
+            transaction.setId(id);
+            this.transactionStorage.save(transaction);
+            return transactionDTO;
+        } catch (EntityExistsException e) {
+            throw new AlreadyExistsException(e.getMessage());
+        } catch (EntityNotFoundException e) {
+            throw new NotFoundException(e.getMessage());
+        }
+        catch (ValidationException e) {
+            throw new IllegalArgumentException(e.getMessage());
+        }
     }
 
     @Transactional
     @Override
     public List<Long> findTransactionIdsByType(String type) {
         this.validateType(type);
-        List<Transaction> transactions =
-                this.transactionRepository.findTransactionsByType(TypeEnum.valueOf(type.toUpperCase()));
-        return transactions
+        return this.transactionStorage.findAllByType(TypeEnum.valueOf(type.toUpperCase()))
                 .stream()
                 .map(Transaction::getId)
                 .collect(Collectors.toList());
-    }
-
-    private void validateBeforeCreate(Transaction transaction) {
-        this.validateNotCreated(transaction.getId());
-
-        this.validateAmountNotEmpty(transaction.getAmount());
-
-        this.validateTypeEnum(transaction.getType());
-
-        if (transaction.getParentId() != null) {
-            this.validateParent(transaction);
-        }
-    }
-
-    private void validateNotCreated(Long transactionId) {
-        if (this.transactionRepository.findById(transactionId).isPresent()) {
-            throw new AlreadyExistsException(
-                    String.format("Transaction with ID %s already exists.", transactionId));
-        }
-    }
-
-    private void validateAmountNotEmpty(Double amount) {
-        if (amount == null || amount.isNaN()) {
-            throw new IllegalArgumentException("Amount should be a non empty number.");
-        }
-    }
-
-    private void validateTypeEnum(TypeEnum type) {
-        if (type == null) {
-            throw new IllegalArgumentException(
-                    String.format("Transaction type should be one of the following: %s",
-                            Arrays.toString(TypeEnum.values())));
-        }
-    }
-
-    private void validateParent(Transaction transaction) {
-        Transaction parentTransaction = transactionRepository.findTransactionById(transaction.getParentId());
-        if (parentTransaction == null) {
-            throw new NotFoundException(
-                    String.format("Parent transaction with ID %s doesn't exist.", transaction.getParentId()));
-        }
     }
 
     private void validateType(String type) {

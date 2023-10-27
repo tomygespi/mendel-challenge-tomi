@@ -1,6 +1,8 @@
 package com.challenge.java.tomi.integration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -13,7 +15,7 @@ import com.challenge.java.tomi.domain.transaction.TypeEnum;
 import com.challenge.java.tomi.dto.TransactionDTO;
 import com.challenge.java.tomi.exception.AlreadyExistsException;
 import com.challenge.java.tomi.exception.NotFoundException;
-import com.challenge.java.tomi.repository.TransactionRepository;
+import com.challenge.java.tomi.storage.TransactionStorage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import lombok.SneakyThrows;
@@ -60,6 +62,8 @@ public class TransactionControllerIntegrationTest {
 
     private static final String UNHANDLED_TRANSACTION_TYPE = "HOTEL";
 
+    private static final Long RANDOM_TRANSACTION_ID = 99L;
+
     private static final String AMOUNT_ERROR_MESSAGE = "Amount should be a non empty number.";
 
     private static final String EXISTING_TRANSACTION_ERROR_MESSAGE = "Transaction with ID %s already exists.";
@@ -73,11 +77,9 @@ public class TransactionControllerIntegrationTest {
     private static final String NOT_SUPPORTED_TYPE_ERROR_MESSAGE =
             "Transaction type %s not supported, you should use one of the following types: %s";
 
-    private static final String DIFFERENT_TRANSACTION_TYPES_ERROR_MESSAGE =
-            "Given transaction can't have a different type than it's parent, which is: %s";
 
     @Autowired
-    private TransactionRepository transactionRepository;
+    private TransactionStorage transactionStorage;
 
     @Autowired
     private MockMvc mockMvc;
@@ -87,7 +89,7 @@ public class TransactionControllerIntegrationTest {
 
     @BeforeEach
     public void clean() {
-        transactionRepository.deleteAll();
+        transactionStorage.deleteAll();
     }
 
     @Nested
@@ -106,11 +108,10 @@ public class TransactionControllerIntegrationTest {
                     //then
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(TRANSACTION_ID))
                     .andExpect(jsonPath("$.type").value(TRANSACTION_TYPE.name()))
                     .andExpect(jsonPath("$.amount").value(TRANSACTION_AMOUNT));
 
-            Transaction savedTransaction = transactionRepository.findTransactionById(TRANSACTION_ID);
+            Transaction savedTransaction = transactionStorage.findById(TRANSACTION_ID);
             assertNotNull(savedTransaction);
             assertEquals(TRANSACTION_ID, savedTransaction.getId());
             assertEquals(TRANSACTION_TYPE, savedTransaction.getType());
@@ -121,9 +122,9 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenTransactionDTOWithSavedParent_whenCreate_thenReturnTransaction() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            transactionStorage.save(newParentTransaction());
             TransactionDTO transactionDTO = newTransactionDTO();
-            transactionDTO.setParentId(parentTransaction.getId());
+            transactionDTO.setParentId(TRANSACTION_PARENT_ID);
 
             //when
             mockMvc
@@ -133,12 +134,11 @@ public class TransactionControllerIntegrationTest {
                     //then
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(TRANSACTION_ID))
                     .andExpect(jsonPath("$.type").value(TRANSACTION_TYPE.name()))
                     .andExpect(jsonPath("$.amount").value(TRANSACTION_AMOUNT))
                     .andExpect(jsonPath("$.parentId").value(TRANSACTION_PARENT_ID));
 
-            Transaction savedTransaction = transactionRepository.findTransactionById(TRANSACTION_ID);
+            Transaction savedTransaction = transactionStorage.findById(TRANSACTION_ID);
 
             assertNotNull(savedTransaction);
             assertEquals(TRANSACTION_ID, savedTransaction.getId());
@@ -151,7 +151,7 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenTransactionDTOWithExistingId_whenCreate_thenReturnConflictWithAlreadyExistsException() {
             //given
-            transactionRepository.save(newTransaction());
+            transactionStorage.save(newTransaction());
             TransactionDTO transactionDTO = newTransactionDTO();
 
             //when
@@ -242,9 +242,9 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenTransactionOtherTypeThanParent_whenCreate_thenReturnTransaction() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            transactionStorage.save(newParentTransaction());
             TransactionDTO transactionDTO = newTransactionDTO();
-            transactionDTO.setParentId(parentTransaction.getId());
+            transactionDTO.setParentId(TRANSACTION_PARENT_ID);
             transactionDTO.setType(OTHER_TRANSACTION_TYPE.name());
 
             //when
@@ -255,16 +255,15 @@ public class TransactionControllerIntegrationTest {
                     //then
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(TRANSACTION_ID))
                     .andExpect(jsonPath("$.type").value(OTHER_TRANSACTION_TYPE.name()))
                     .andExpect(jsonPath("$.amount").value(TRANSACTION_AMOUNT))
                     .andExpect(jsonPath("$.parentId").value(TRANSACTION_PARENT_ID));
 
-            Transaction savedTransaction = transactionRepository.findTransactionById(TRANSACTION_ID);
-            Transaction savedParentTransaction = transactionRepository.findTransactionById(TRANSACTION_PARENT_ID);
+            Transaction savedTransaction = transactionStorage.findById(TRANSACTION_ID);
+            Transaction savedParentTransaction = transactionStorage.findById(TRANSACTION_PARENT_ID);
 
             assertNotNull(savedTransaction);
-            assertNotNull(parentTransaction);
+            assertNotNull(savedParentTransaction);
             assertEquals(TRANSACTION_ID, savedTransaction.getId());
             assertEquals(TRANSACTION_PARENT_ID, savedParentTransaction.getId());
             assertNotEquals(savedParentTransaction.getId(), savedTransaction.getId());
@@ -277,11 +276,11 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenTransactionType_whenFindTransactionsByType_thenReturnTransactionIdsList() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            transactionStorage.save(newParentTransaction());
             Transaction childTransaction = newTransaction();
-            childTransaction.setParentId(parentTransaction.getId());
-            transactionRepository.save(childTransaction);
-            Transaction otherTransactionWithOtherType = transactionRepository.save(newOtherTransaction());
+            childTransaction.setParentId(TRANSACTION_PARENT_ID);
+            transactionStorage.save(childTransaction);
+            transactionStorage.save(newOtherTransaction());
             String type = childTransaction.getType().name();
 
             //when
@@ -292,7 +291,7 @@ public class TransactionControllerIntegrationTest {
                     .andDo(print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(2))
-                    .andExpect(jsonPath("$.[0]").value(parentTransaction.getId()))
+                    .andExpect(jsonPath("$.[0]").value(TRANSACTION_PARENT_ID))
                     .andExpect(jsonPath("$.[1]").value(childTransaction.getId()));
         }
 
@@ -300,10 +299,10 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenUnhandledTransactionType_whenFindTransactionsByType_thenReturnBadRequestWithIllegalArgument() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            transactionStorage.save(newParentTransaction());
             Transaction childTransaction = newTransaction();
-            childTransaction.setParentId(parentTransaction.getId());
-            transactionRepository.save(childTransaction);
+            childTransaction.setParentId(TRANSACTION_PARENT_ID);
+            transactionStorage.save(childTransaction);
 
             //when
             MvcResult response =
@@ -328,13 +327,19 @@ public class TransactionControllerIntegrationTest {
     class calculateAmountSumTests {
         @Test
         @SneakyThrows
-        public void givenParentIdWithNestedTransaction_whenGetTotalAmountByParentTransaction_thenReturnSumOfBoth() {
+        public void givenNestedTransactions_whenGetTotalAmountByParentTransaction_thenReturnSumOfAllAmounts() {
             //given
             Transaction parentTransaction = newParentTransaction();
             Transaction childTransaction = newTransaction();
             childTransaction.setParentId(parentTransaction.getId());
-            transactionRepository.save(parentTransaction);
-            transactionRepository.save(childTransaction);
+            Transaction childOfChildTransaction = newOtherTransaction();
+            childOfChildTransaction.setParentId(childTransaction.getId());
+            Transaction nonRelatedTransaction = newTransaction();
+            nonRelatedTransaction.setId(RANDOM_TRANSACTION_ID);
+            transactionStorage.save(parentTransaction);
+            transactionStorage.save(childTransaction);
+            transactionStorage.save(childOfChildTransaction);
+            transactionStorage.save(nonRelatedTransaction);
 
             //when
             mockMvc
@@ -345,7 +350,9 @@ public class TransactionControllerIntegrationTest {
                     .andDo(print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.sum")
-                            .value(TRANSACTION_AMOUNT + TRANSACTION_PARENT_AMOUNT));
+                            .value(parentTransaction.getAmount() +
+                                            childTransaction.getAmount() +
+                                            childOfChildTransaction.getAmount()));
         }
 
         @Test
@@ -353,7 +360,7 @@ public class TransactionControllerIntegrationTest {
         public void givenParentIdWithoutNestedTransactions_whenGetTotalAmountByParentId_thenReturnParentAmount() {
             //given
             Transaction parentTransaction = newParentTransaction();
-            transactionRepository.save(parentTransaction);
+            transactionStorage.save(parentTransaction);
 
             //when
             mockMvc

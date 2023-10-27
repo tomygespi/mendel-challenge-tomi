@@ -6,7 +6,6 @@ import com.challenge.java.tomi.dto.TransactionDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
-import org.mapstruct.factory.Mappers;
 
 /**
  * Mapper for Transaction and TransactionDTO.
