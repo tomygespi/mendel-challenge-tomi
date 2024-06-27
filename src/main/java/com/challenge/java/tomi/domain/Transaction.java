@@ -1,27 +1,18 @@
 package com.challenge.java.tomi.domain;
 
 import com.challenge.java.tomi.domain.transaction.TypeEnum;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Enumerated;
+import com.challenge.java.tomi.dto.TransactionDTO;
 import jakarta.persistence.EnumType;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
-import java.util.Set;
+import jakarta.persistence.Enumerated;
+import java.util.Arrays;
+import javax.validation.ValidationException;
 import javax.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
-@Entity
 @Setter
 public class Transaction {
-    @Id
-    @Column(name = "id")
     private Long id;
 
     @NotNull
@@ -30,10 +21,37 @@ public class Transaction {
     @Enumerated(EnumType.STRING)
     private TypeEnum type;
 
-    @Column(name = "parent_id")
     private Long parentId;
 
-    @OneToMany(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id")
-    private Set<Transaction> nestedTransactions;
+    public Transaction() {}
+
+    public Transaction(Long id, TransactionDTO transactionDTO) {
+        this.validateAmount(transactionDTO.getAmount());
+        this.validateType(transactionDTO.getType());
+        this.id = id;
+        this.amount = transactionDTO.getAmount();
+        this.type = TypeEnum.find(transactionDTO.getType().toUpperCase());
+        this.parentId = transactionDTO.getParentId();
+    }
+
+    @Override
+    public String toString() {
+        return "Transaction{" +
+                "id=" + id +
+                ", amount=" + amount +
+                ", type=" + type +
+                ", parentId=" + parentId +
+                '}';
+    }
+
+    private void validateAmount(Double amount) {
+        if (amount == null || amount.isNaN()) throw new ValidationException("Amount should be a non empty number.");
+    }
+
+    private void validateType(String type) {
+        if (type == null || TypeEnum.find(type.toUpperCase()) == null) {
+            throw new ValidationException(String.format("Transaction type should be one of the following: {%s}",
+                    Arrays.toString(TypeEnum.values())));
+        }
+    }
 }

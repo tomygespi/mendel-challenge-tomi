@@ -1,9 +1,10 @@
 package com.challenge.java.tomi.dto;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serial;
 import java.io.Serializable;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,5 +21,15 @@ public class TransactionDTO implements Serializable {
     @NotBlank
     private String type;
 
+    @JsonProperty("parent_id")
     private Long parentId;
+
+    @Override
+    public String toString() {
+        return "TransactionDTO{" +
+                "amount=" + amount +
+                ", type='" + type + '\'' +
+                ", parentId=" + parentId +
+                '}';
+    }
 }

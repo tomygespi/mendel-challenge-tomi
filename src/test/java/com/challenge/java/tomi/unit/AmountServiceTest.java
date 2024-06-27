@@ -1,5 +1,9 @@
 package com.challenge.java.tomi.unit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
+
 import com.challenge.java.tomi.domain.Transaction;
 import com.challenge.java.tomi.domain.transaction.TypeEnum;
 import com.challenge.java.tomi.dto.AmountSumDTO;
@@ -7,6 +11,7 @@ import com.challenge.java.tomi.exception.NotFoundException;
 import com.challenge.java.tomi.repository.TransactionRepository;
 import com.challenge.java.tomi.service.AmountService;
 import com.challenge.java.tomi.service.IAmountService;
+import java.util.List;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,13 +19,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.util.HashSet;
-import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.when;
 
 public class AmountServiceTest {
 
@@ -65,7 +63,8 @@ public class AmountServiceTest {
             Transaction childTransaction = newChildTransaction(parentTransaction);
 
             //when
-            when(transactionRepository.findTransactionById(PARENT_TRANSACTION_ID)).thenReturn(parentTransaction);
+            when(transactionRepository.findAllByParentId(PARENT_TRANSACTION_ID))
+                    .thenReturn(List.of(parentTransaction, childTransaction));
 
             AmountSumDTO sum = amountService.calculateTotalAmountByParentTransaction(PARENT_TRANSACTION_ID);
 
@@ -80,7 +79,7 @@ public class AmountServiceTest {
             Transaction parentTransaction = newParentTransaction();
 
             //when
-            when(transactionRepository.findTransactionById(PARENT_TRANSACTION_ID)).thenReturn(parentTransaction);
+            when(transactionRepository.findAllByParentId(PARENT_TRANSACTION_ID)).thenReturn(List.of(parentTransaction));
 
             AmountSumDTO sum = amountService.calculateTotalAmountByParentTransaction(PARENT_TRANSACTION_ID);
 
@@ -93,7 +92,7 @@ public class AmountServiceTest {
         public void givenUnsavedTransactionId_whenCalculateTotalAmountByParentId_thenThrowNotFoundException() {
             //given
             //when
-            when(transactionRepository.findTransactionById(PARENT_TRANSACTION_ID)).thenReturn(null);
+            when(transactionRepository.findById(PARENT_TRANSACTION_ID)).thenReturn(null);
 
             //then
             assertThrows(NotFoundException.class, () -> {
@@ -116,7 +115,6 @@ public class AmountServiceTest {
         childTransaction.setAmount(CHILD_TRANSACTION_AMOUNT);
         childTransaction.setType(CHILD_TRANSACTION_TYPE);
         childTransaction.setParentId(parentTransaction.getParentId());
-        parentTransaction.setNestedTransactions(new HashSet<>(Set.of(childTransaction)));
         return childTransaction;
     }
 }

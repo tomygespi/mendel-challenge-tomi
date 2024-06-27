@@ -4,24 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.challenge.java.tomi.domain.Transaction;
 import com.challenge.java.tomi.domain.transaction.TypeEnum;
 import com.challenge.java.tomi.dto.TransactionDTO;
-import com.challenge.java.tomi.exception.AlreadyExistsException;
-import com.challenge.java.tomi.exception.NotFoundException;
-import com.challenge.java.tomi.mapper.TransactionMapper;
-import com.challenge.java.tomi.mapper.TransactionMapperImpl;
 import com.challenge.java.tomi.repository.TransactionRepository;
 import com.challenge.java.tomi.service.ITransactionService;
 import com.challenge.java.tomi.service.TransactionService;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,8 +38,6 @@ public class TransactionServiceTest {
 
     private static final String UNHANDLED_TRANSACTION_TYPE = "USD";
 
-    private final TransactionMapper transactionMapper = new TransactionMapperImpl();
-
     @Mock
     private TransactionRepository transactionRepository;
 
@@ -55,7 +49,7 @@ public class TransactionServiceTest {
     public void initService() {
         closeable = MockitoAnnotations.openMocks(this);
         transactionService =
-                new TransactionService(this.transactionMapper, this.transactionRepository);
+                new TransactionService(this.transactionRepository);
     }
 
     @AfterEach
@@ -73,10 +67,12 @@ public class TransactionServiceTest {
             Transaction mappedTransaction = newMappedTransactionFromTransactionDTO(transactionDTO);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.save(any(Transaction.class))).thenReturn(mappedTransaction);
+            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(null);
+            doNothing().when(transactionRepository).save(any(Transaction.class));
+            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(mappedTransaction);
 
-            Transaction savedTransaction = transactionService.create(TRANSACTION_ID, transactionDTO);
+            transactionService.create(TRANSACTION_ID, transactionDTO);
+            Transaction savedTransaction = transactionRepository.findById(TRANSACTION_ID);
 
             //then
             verify(transactionRepository, atLeastOnce()).save(any(Transaction.class));
@@ -98,11 +94,14 @@ public class TransactionServiceTest {
             parentTransaction.setAmount(TRANSACTION_AMOUNT);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.findTransactionById(TRANSACTION_PARENT_ID)).thenReturn(parentTransaction);
-            when(transactionRepository.save(any(Transaction.class))).thenReturn(mappedTransaction);
+            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(null);
+            when(transactionRepository.findById(TRANSACTION_PARENT_ID)).thenReturn(parentTransaction);
 
-            Transaction savedTransaction = transactionService.create(TRANSACTION_ID, transactionDTO);
+            doNothing().when(transactionRepository).save(any(Transaction.class));
+            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(mappedTransaction);
+
+            transactionService.create(TRANSACTION_ID, transactionDTO);
+            Transaction savedTransaction = transactionRepository.findById(TRANSACTION_ID);
 
             //then
             verify(transactionRepository, atLeastOnce()).save(any(Transaction.class));
@@ -120,7 +119,7 @@ public class TransactionServiceTest {
             transactionDTO.setAmount(null);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
+            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(null);
 
             //then
             assertThrows(IllegalArgumentException.class, () -> {
@@ -136,41 +135,10 @@ public class TransactionServiceTest {
             transactionDTO.setType(UNHANDLED_TRANSACTION_TYPE);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
+            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(null);
 
             //then
             assertThrows(IllegalArgumentException.class, () -> {
-                transactionService.create(TRANSACTION_ID, transactionDTO);
-            });
-        }
-
-        @Test
-        @SneakyThrows
-        public void givenTransactionDTOWithExistingId_whenCreateTransaction_thenThrowAlreadyExistsException() {
-            //given
-            TransactionDTO transactionDTO = newTransactionDTO();
-            Transaction mappedTransaction = newMappedTransactionFromTransactionDTO(transactionDTO);
-
-            //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.of(mappedTransaction));
-
-            //then
-            assertThrows(AlreadyExistsException.class, () -> {
-                transactionService.create(TRANSACTION_ID, transactionDTO);
-            });
-        }
-
-        @Test
-        @SneakyThrows
-        public void givenTransactionDTOWithNonExistingParent_whenCreateTransaction_thenThrowIllegalArgumentException() {
-            //given
-            TransactionDTO transactionDTO = newTransactionDTOWithParentId();
-
-            //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.findTransactionById(TRANSACTION_PARENT_ID)).thenReturn(null);
-            //then
-            assertThrows(NotFoundException.class, () -> {
                 transactionService.create(TRANSACTION_ID, transactionDTO);
             });
         }
@@ -188,8 +156,8 @@ public class TransactionServiceTest {
             parentTransaction.setAmount(TRANSACTION_AMOUNT);
 
             //when
-            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(Optional.empty());
-            when(transactionRepository.findTransactionById(TRANSACTION_PARENT_ID)).thenReturn(parentTransaction);
+            when(transactionRepository.findById(TRANSACTION_ID)).thenReturn(null);
+            when(transactionRepository.findById(TRANSACTION_PARENT_ID)).thenReturn(parentTransaction);
 
             //then
             assertThrows(IllegalArgumentException.class, () -> {
@@ -209,7 +177,7 @@ public class TransactionServiceTest {
                     new ArrayList<>(List.of(newMappedTransactionFromTransactionDTO(newTransactionDTO())));
 
             //when
-            when(transactionRepository.findTransactionsByType(TRANSACTION_TYPE)).thenReturn(savedTransactions);
+            when(transactionRepository.findAllByType(TRANSACTION_TYPE)).thenReturn(savedTransactions);
 
             List<Long> foundTransactionIds = transactionService.findTransactionIdsByType(transactionType);
 
@@ -225,7 +193,7 @@ public class TransactionServiceTest {
             //given
             String transactionType = TRANSACTION_TYPE.name();
             //when
-            when(transactionRepository.findTransactionsByType(TRANSACTION_TYPE)).thenReturn(new ArrayList<>());
+            when(transactionRepository.findAllByType(TRANSACTION_TYPE)).thenReturn(new ArrayList<>());
 
             List<Long> foundTransactionIds = transactionService.findTransactionIdsByType(transactionType);
 
@@ -264,9 +232,7 @@ public class TransactionServiceTest {
     }
 
     private Transaction newMappedTransactionFromTransactionDTO(TransactionDTO transactionDTO) {
-        Transaction mappedTransaction = this.transactionMapper.toTransaction(transactionDTO);
-        mappedTransaction.setId(TRANSACTION_ID);
-        return mappedTransaction;
+        return new Transaction(TRANSACTION_ID, transactionDTO);
     }
 
 }

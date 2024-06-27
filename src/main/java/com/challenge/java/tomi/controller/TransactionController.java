@@ -6,13 +6,12 @@ import com.challenge.java.tomi.dto.TransactionDTO;
 import com.challenge.java.tomi.service.IAmountService;
 import com.challenge.java.tomi.service.ITransactionService;
 import com.challenge.java.tomi.service.TransactionService;
-import java.util.List;
-import javax.validation.Valid;
-
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import java.util.List;
+import javax.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -51,7 +50,7 @@ public class TransactionController {
             description = "Transaction already exists for given transaction ID",
             content = @Content
     )
-    public ResponseEntity<Transaction> create(
+    public ResponseEntity<TransactionDTO> create(
             @PathVariable Long transactionId,
             @Valid @RequestBody TransactionDTO transactionDTO) {
         return ResponseEntity.ok(this.transactionService.create(transactionId, transactionDTO));

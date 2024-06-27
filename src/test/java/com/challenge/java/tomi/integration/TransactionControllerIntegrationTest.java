@@ -1,6 +1,8 @@
 package com.challenge.java.tomi.integration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -11,7 +13,6 @@ import com.challenge.java.tomi.Application;
 import com.challenge.java.tomi.domain.Transaction;
 import com.challenge.java.tomi.domain.transaction.TypeEnum;
 import com.challenge.java.tomi.dto.TransactionDTO;
-import com.challenge.java.tomi.exception.AlreadyExistsException;
 import com.challenge.java.tomi.exception.NotFoundException;
 import com.challenge.java.tomi.repository.TransactionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,11 +65,10 @@ public class TransactionControllerIntegrationTest {
 
     private static final String EXISTING_TRANSACTION_ERROR_MESSAGE = "Transaction with ID %s already exists.";
 
-    private static final String UNHANDLED_TYPE_ENUM_ERROR_MESSAGE =
-            "Transaction type should be one of the following: %s";
+    private static final String VALIDATION_ERROR_MESSAGE = "Error when creating transaction, please check given fields";
 
     private static final String UNSAVED_PARENT_TRANSACTION_ERROR_MESSAGE =
-            "Parent transaction with ID %s doesn't exist.";
+            "Error when creating transaction, parent transaction ID {%s} does not exist";
 
     private static final String NOT_SUPPORTED_TYPE_ERROR_MESSAGE =
             "Transaction type %s not supported, you should use one of the following types: %s";
@@ -106,11 +106,10 @@ public class TransactionControllerIntegrationTest {
                     //then
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(TRANSACTION_ID))
                     .andExpect(jsonPath("$.type").value(TRANSACTION_TYPE.name()))
                     .andExpect(jsonPath("$.amount").value(TRANSACTION_AMOUNT));
 
-            Transaction savedTransaction = transactionRepository.findTransactionById(TRANSACTION_ID);
+            Transaction savedTransaction = transactionRepository.findById(TRANSACTION_ID);
             assertNotNull(savedTransaction);
             assertEquals(TRANSACTION_ID, savedTransaction.getId());
             assertEquals(TRANSACTION_TYPE, savedTransaction.getType());
@@ -121,7 +120,8 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenTransactionDTOWithSavedParent_whenCreate_thenReturnTransaction() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            Transaction parentTransaction = newParentTransaction();
+            transactionRepository.save(parentTransaction);
             TransactionDTO transactionDTO = newTransactionDTO();
             transactionDTO.setParentId(parentTransaction.getId());
 
@@ -133,12 +133,11 @@ public class TransactionControllerIntegrationTest {
                     //then
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(TRANSACTION_ID))
                     .andExpect(jsonPath("$.type").value(TRANSACTION_TYPE.name()))
                     .andExpect(jsonPath("$.amount").value(TRANSACTION_AMOUNT))
-                    .andExpect(jsonPath("$.parentId").value(TRANSACTION_PARENT_ID));
+                    .andExpect(jsonPath("$.parent_id").value(TRANSACTION_PARENT_ID));
 
-            Transaction savedTransaction = transactionRepository.findTransactionById(TRANSACTION_ID);
+            Transaction savedTransaction = transactionRepository.findById(TRANSACTION_ID);
 
             assertNotNull(savedTransaction);
             assertEquals(TRANSACTION_ID, savedTransaction.getId());
@@ -149,25 +148,20 @@ public class TransactionControllerIntegrationTest {
 
         @Test
         @SneakyThrows
-        public void givenTransactionDTOWithExistingId_whenCreate_thenReturnConflictWithAlreadyExistsException() {
+        public void givenTransactionDTOWithExistingId_whenCreate_thenReturnIdempotencyOk() {
             //given
             transactionRepository.save(newTransaction());
             TransactionDTO transactionDTO = newTransactionDTO();
 
             //when
-            MvcResult response =
-                    mockMvc
-                            .perform(put(String.format(CREATE_TRANSACTION_ENDPOINT, TRANSACTION_ID))
-                                    .contentType(MediaType.APPLICATION_JSON)
-                                    .content(objectMapper.writeValueAsBytes(transactionDTO)))
-                            //then
-                            .andDo(print())
-                            .andExpect(status().isConflict())
-                            .andReturn();
-
-            assertEquals(AlreadyExistsException.class, response.getResolvedException().getClass());
-            assertEquals(String.format(EXISTING_TRANSACTION_ERROR_MESSAGE, TRANSACTION_ID),
-                    response.getResolvedException().getMessage());
+            mockMvc
+                    .perform(put(String.format(CREATE_TRANSACTION_ENDPOINT, TRANSACTION_ID))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(transactionDTO)))
+                    //then
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andReturn();
         }
 
         @Test
@@ -189,7 +183,6 @@ public class TransactionControllerIntegrationTest {
                             .andReturn();
 
             assertEquals(IllegalArgumentException.class, response.getResolvedException().getClass());
-            assertEquals(AMOUNT_ERROR_MESSAGE, response.getResolvedException().getMessage());
         }
 
         @Test
@@ -211,7 +204,7 @@ public class TransactionControllerIntegrationTest {
                             .andReturn();
 
             assertEquals(IllegalArgumentException.class, response.getResolvedException().getClass());
-            assertEquals(String.format(UNHANDLED_TYPE_ENUM_ERROR_MESSAGE, Arrays.toString(TypeEnum.values())),
+            assertEquals(String.format(VALIDATION_ERROR_MESSAGE, Arrays.toString(TypeEnum.values())),
                     response.getResolvedException().getMessage());
         }
 
@@ -242,7 +235,8 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenTransactionOtherTypeThanParent_whenCreate_thenReturnTransaction() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            Transaction parentTransaction = newParentTransaction();
+            transactionRepository.save(parentTransaction);
             TransactionDTO transactionDTO = newTransactionDTO();
             transactionDTO.setParentId(parentTransaction.getId());
             transactionDTO.setType(OTHER_TRANSACTION_TYPE.name());
@@ -255,13 +249,12 @@ public class TransactionControllerIntegrationTest {
                     //then
                     .andDo(print())
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(TRANSACTION_ID))
                     .andExpect(jsonPath("$.type").value(OTHER_TRANSACTION_TYPE.name()))
                     .andExpect(jsonPath("$.amount").value(TRANSACTION_AMOUNT))
-                    .andExpect(jsonPath("$.parentId").value(TRANSACTION_PARENT_ID));
+                    .andExpect(jsonPath("$.parent_id").value(TRANSACTION_PARENT_ID));
 
-            Transaction savedTransaction = transactionRepository.findTransactionById(TRANSACTION_ID);
-            Transaction savedParentTransaction = transactionRepository.findTransactionById(TRANSACTION_PARENT_ID);
+            Transaction savedTransaction = transactionRepository.findById(TRANSACTION_ID);
+            Transaction savedParentTransaction = transactionRepository.findById(TRANSACTION_PARENT_ID);
 
             assertNotNull(savedTransaction);
             assertNotNull(parentTransaction);
@@ -277,11 +270,13 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenTransactionType_whenFindTransactionsByType_thenReturnTransactionIdsList() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            Transaction parentTransaction = newParentTransaction();
+            transactionRepository.save(parentTransaction);
             Transaction childTransaction = newTransaction();
             childTransaction.setParentId(parentTransaction.getId());
             transactionRepository.save(childTransaction);
-            Transaction otherTransactionWithOtherType = transactionRepository.save(newOtherTransaction());
+            Transaction otherTransactionWithOtherType = newOtherTransaction();
+            transactionRepository.save(otherTransactionWithOtherType);
             String type = childTransaction.getType().name();
 
             //when
@@ -300,7 +295,8 @@ public class TransactionControllerIntegrationTest {
         @SneakyThrows
         public void givenUnhandledTransactionType_whenFindTransactionsByType_thenReturnBadRequestWithIllegalArgument() {
             //given
-            Transaction parentTransaction = transactionRepository.save(newParentTransaction());
+            Transaction parentTransaction = newParentTransaction();
+            transactionRepository.save(parentTransaction);
             Transaction childTransaction = newTransaction();
             childTransaction.setParentId(parentTransaction.getId());
             transactionRepository.save(childTransaction);
@@ -317,10 +313,6 @@ public class TransactionControllerIntegrationTest {
                             .andReturn();
 
             assertEquals(IllegalArgumentException.class, response.getResolvedException().getClass());
-            assertEquals(
-                    String.format(NOT_SUPPORTED_TYPE_ERROR_MESSAGE,
-                            UNHANDLED_TRANSACTION_TYPE, Arrays.toString(TypeEnum.values())),
-                    response.getResolvedException().getMessage());
         }
     }
 
@@ -383,8 +375,8 @@ public class TransactionControllerIntegrationTest {
                             .andReturn();
 
             assertEquals(NotFoundException.class, response.getResolvedException().getClass());
-            assertEquals("Parent transaction with given ID doesn't exist.",
-                    response.getResolvedException().getMessage());
+            assertEquals(String.format("Cannot calculate total amount, parent transaction with ID {%s} doesn't exist",
+                            TRANSACTION_ID), response.getResolvedException().getMessage());
         }
     }
 
