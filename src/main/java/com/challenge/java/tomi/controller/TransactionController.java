@@ -45,11 +45,6 @@ public class TransactionController {
             description = "Transaction not found",
             content = @Content
     )
-    @ApiResponse(
-            responseCode = "409",
-            description = "Transaction already exists for given transaction ID",
-            content = @Content
-    )
     public ResponseEntity<TransactionDTO> create(
             @PathVariable Long transactionId,
             @Valid @RequestBody TransactionDTO transactionDTO) {

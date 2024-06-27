@@ -13,20 +13,6 @@ public class ControllerExceptionHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(ControllerExceptionHandler.class);
 
     /**
-     * Handler for already exists exception.
-     * @param e the exception thrown during request processing.
-     * @return ResponseEntity with 409 status code and description indicating an already exists error.
-     */
-    @ExceptionHandler({AlreadyExistsException.class})
-    protected ResponseEntity<ApiError> handleAlreadyExistsException(AlreadyExistsException e) {
-        LOGGER.warn("Already exists exception", e);
-
-        ApiError apiError =
-                new ApiError("already_exists", e.getMessage(), HttpStatus.CONFLICT.value());
-        return ResponseEntity.status(apiError.getStatusCode()).body(apiError);
-    }
-
-    /**
      * Handler for illegal argument exception.
      * @param e the exception thrown during request processing.
      * @return ResponseEntity with 400 status code and description indicating an illegal argument error.
